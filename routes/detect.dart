@@ -84,7 +84,7 @@ Future<Response> onRequest(RequestContext context) async {
 
 // ----- STEP 2: Initialize Latest Flash Model -----
 final model = GenerativeModel(
-  model: 'gemini-2.0-flash', // Upgraded to Gemini 2.0 Flash
+  model: 'gemini-2.5-flash', // We use 2.5 because it is the latest and fastest
   apiKey: _apiKey,
   generationConfig: GenerationConfig(
     temperature: 0.1,
