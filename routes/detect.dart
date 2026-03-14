@@ -207,19 +207,30 @@ Future<Response> onRequest(RequestContext context) async {
     }
   } catch (e, stackTrace) {
     final errorString = e.toString().toLowerCase();
+    print('ERROR ENCOUNTERED: $e'); 
+    
+    // 1. Check for Expired or Invalid API Key (CRITICAL)
+    if (errorString.contains('api key expired') || errorString.contains('key_invalid') || errorString.contains('invalid api key')) {
+      return Response.json(
+        body: {
+          'error': 'API_KEY_EXPIRED',
+          'message': '🔴 YOUR API KEY HAS EXPIRED! \n\nPlease go to https://aistudio.google.com/apikey and create a NEW key, then update your Render environment variable.',
+        },
+        statusCode: 401,
+      );
+    }
 
-    // Check if it's a rate limit or quota issue
+    // 2. Check if it's a rate limit or quota issue
     if (errorString.contains('quota exceeded') || errorString.contains('429')) {
       return Response.json(
         body: {
           'error': 'API_LIMIT_REACHED',
-          'message':
-              'Our AI servers are currently full (Per-Minute Quota Exceeded). Please wait 1 minute and try again!',
+          'message': '⏳ Our AI servers are currently full (Per-Minute Quota Exceeded). Please wait 1 minute and try again!',
         },
         statusCode: 429,
       );
-    }
-    // Check if Google's server is down or unreachable
+    } 
+    // 3. Check if Google's server is down or unreachable
     else if (errorString.contains('unavaila') ||
         errorString.contains('socket') ||
         errorString.contains('connection')) {
