@@ -1,0 +1,10 @@
+.dart_tool/
+.packages
+build/
+coverage/
+doc/
+.env
+.gitignore
+.dockerignore
+Dockerfile
+Service_Account.json
