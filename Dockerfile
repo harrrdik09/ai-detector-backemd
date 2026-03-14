@@ -17,7 +17,8 @@ RUN dart pub global run dart_frog_cli:dart_frog build
 
 # 6. Compile the generated server Dart code to an executable
 WORKDIR /app/build
-RUN dart compile exe bin/server.dart -o /app/bin/server
+RUN dart pub get
+RUN dart compile exe bin/server.dart -o bin/server
 
 # 7. Final minimal serving image layer
 # Using debian instead of 'scratch' so we have SSL certificates (needed for Gemini API)
@@ -29,7 +30,7 @@ RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/
 # Copy runtime from dart image
 COPY --from=build /runtime/ /
 # Copy compiled executable
-COPY --from=build /app/bin/server /app/bin/
+COPY --from=build /app/build/bin/server /app/bin/
 
 # Set env and start the server
 ENV PORT=8080
