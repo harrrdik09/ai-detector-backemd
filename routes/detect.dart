@@ -64,9 +64,11 @@ Future<Response> onRequest(RequestContext context) async {
     );
   }
 
-  // ── DEVICE ID QUOTA CHECK ── 
+  // ── DEVICE ID QUOTA CHECK ──
   final headers = context.request.headers;
-  final deviceId = headers['Device-Id'] ?? 'unknown_device';
+  // Dart HTTP headers are always lowercased automatically
+  final deviceId =
+      headers['device-id'] ?? headers['Device-Id'] ?? 'unknown_device';
 
   Map<String, dynamic> db = {};
   if (_dbFile.existsSync()) {
@@ -116,17 +118,18 @@ Future<Response> onRequest(RequestContext context) async {
       );
     }
 
-
 // ----- STEP 2: Initialize Latest Flash Model -----
-final model = GenerativeModel(
-  model: 'gemini-2.5-flash', // We use 2.5 because it is the latest and fastest
-  apiKey: _apiKey,
-  generationConfig: GenerationConfig(
-    temperature: 0.1,
-    maxOutputTokens: 1024,
-    responseMimeType: 'application/json', // Forces Gemini to return pure JSON
-  ),
-);
+    final model = GenerativeModel(
+      model:
+          'gemini-2.5-flash', // We use 2.5 because it is the latest and fastest
+      apiKey: _apiKey,
+      generationConfig: GenerationConfig(
+        temperature: 0.1,
+        maxOutputTokens: 1024,
+        responseMimeType:
+            'application/json', // Forces Gemini to return pure JSON
+      ),
+    );
 
     // ----- STEP 3: Send image to Gemini for analysis -----
     // Detect the image MIME type from the first bytes
@@ -174,14 +177,11 @@ final model = GenerativeModel(
 
     // Parse the JSON response from Gemini
     try {
-      final result =
-          jsonDecode(cleanedText) as Map<String, dynamic>;
+      final result = jsonDecode(cleanedText) as Map<String, dynamic>;
 
       final isAI = result['isAI'] as bool? ?? false;
-      final confidence =
-          (result['confidence'] as num?)?.toDouble() ?? 0.0;
-      final reason =
-          result['reason'] as String? ?? 'No reason provided';
+      final confidence = (result['confidence'] as num?)?.toDouble() ?? 0.0;
+      final reason = result['reason'] as String? ?? 'No reason provided';
 
       return Response.json(
         body: {
@@ -207,28 +207,32 @@ final model = GenerativeModel(
     }
   } catch (e, stackTrace) {
     final errorString = e.toString().toLowerCase();
-    
+
     // Check if it's a rate limit or quota issue
     if (errorString.contains('quota exceeded') || errorString.contains('429')) {
       return Response.json(
         body: {
           'error': 'API_LIMIT_REACHED',
-          'message': 'Our AI servers are currently full (Per-Minute Quota Exceeded). Please wait 1 minute and try again!',
+          'message':
+              'Our AI servers are currently full (Per-Minute Quota Exceeded). Please wait 1 minute and try again!',
         },
         statusCode: 429,
       );
-    } 
+    }
     // Check if Google's server is down or unreachable
-    else if (errorString.contains('unavaila') || errorString.contains('socket') || errorString.contains('connection')) {
+    else if (errorString.contains('unavaila') ||
+        errorString.contains('socket') ||
+        errorString.contains('connection')) {
       return Response.json(
         body: {
           'error': 'SERVER_DOWN',
-          'message': 'The AI Server is currently unreachable. Please try again later.',
+          'message':
+              'The AI Server is currently unreachable. Please try again later.',
         },
         statusCode: 503,
       );
     }
-    
+
     // Generic server error
     return Response.json(
       body: {
