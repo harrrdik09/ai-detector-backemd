@@ -42,6 +42,8 @@ Respond ONLY with a valid JSON object in this exact format (no markdown, no extr
 // 📦 MAIN REQUEST HANDLER
 // -----------------------------------------------------------------------
 
+final File _dbFile = File('${Directory.current.path}/db.json');
+
 Future<Response> onRequest(RequestContext context) async {
   // Only allow POST requests
   if (context.request.method != HttpMethod.post) {
@@ -59,6 +61,39 @@ Future<Response> onRequest(RequestContext context) async {
             'Please set the GEMINI_API_KEY environment variable.',
       },
       statusCode: HttpStatus.internalServerError,
+    );
+  }
+
+  // ── DEVICE ID QUOTA CHECK ── 
+  final headers = context.request.headers;
+  final deviceId = headers['Device-Id'] ?? 'unknown_device';
+
+  Map<String, dynamic> db = {};
+  if (_dbFile.existsSync()) {
+    final content = _dbFile.readAsStringSync();
+    if (content.isNotEmpty) {
+      db = jsonDecode(content) as Map<String, dynamic>;
+    }
+  }
+
+  // Initialize if new device
+  if (!db.containsKey(deviceId)) {
+    db[deviceId] = {'scans': 0, 'limit': 15};
+  }
+
+  // Check quota
+  final scans = db[deviceId]['scans'] as int;
+  final limit = db[deviceId]['limit'] as int;
+
+  if (scans >= limit) {
+    return Response.json(
+      body: {
+        'error': 'QUOTA_EXCEEDED',
+        'message': 'You have used all $limit free scans. Please recharge.',
+        'scans': scans,
+        'limit': limit,
+      },
+      statusCode: HttpStatus.forbidden,
     );
   }
 
@@ -133,6 +168,10 @@ final model = GenerativeModel(
           .trim();
     }
 
+    // ── INCREASE QUOTA USAGE ──
+    db[deviceId]['scans'] = scans + 1;
+    _dbFile.writeAsStringSync(jsonEncode(db));
+
     // Parse the JSON response from Gemini
     try {
       final result =
@@ -152,6 +191,7 @@ final model = GenerativeModel(
               ? '⚠️ AI-Generated Image Detected'
               : '✅ Image appears to be Real',
           'reason': reason,
+          'scansLeft': limit - (scans + 1), // Optional: inform frontend
         },
       );
     } catch (parseError) {
@@ -166,9 +206,34 @@ final model = GenerativeModel(
       );
     }
   } catch (e, stackTrace) {
+    final errorString = e.toString().toLowerCase();
+    
+    // Check if it's a rate limit or quota issue
+    if (errorString.contains('quota exceeded') || errorString.contains('429')) {
+      return Response.json(
+        body: {
+          'error': 'API_LIMIT_REACHED',
+          'message': 'Our AI servers are currently full (Per-Minute Quota Exceeded). Please wait 1 minute and try again!',
+        },
+        statusCode: 429,
+      );
+    } 
+    // Check if Google's server is down or unreachable
+    else if (errorString.contains('unavaila') || errorString.contains('socket') || errorString.contains('connection')) {
+      return Response.json(
+        body: {
+          'error': 'SERVER_DOWN',
+          'message': 'The AI Server is currently unreachable. Please try again later.',
+        },
+        statusCode: 503,
+      );
+    }
+    
+    // Generic server error
     return Response.json(
       body: {
-        'error': 'Server error: $e',
+        'error': 'SERVER_ERROR',
+        'message': 'An unexpected server error occurred: $e',
         'stackTrace': '$stackTrace',
       },
       statusCode: HttpStatus.internalServerError,
