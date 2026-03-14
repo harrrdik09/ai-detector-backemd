@@ -17,10 +17,8 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 // -----------------------------------------------------------------------
 // 🔑 API KEY — Secured via Environment Variables
 // -----------------------------------------------------------------------
-// Render.com will pass this securely to our app.
-// If it's not set in the environment, it uses a fallback (for local testing).
-final String _apiKey = Platform.environment['GEMINI_API_KEY'] ?? 
-    'AIzaSyBfI-U4jnWLs4bxntF7kOFOUM8yCqmOAPs';
+// The API key is ONLY read from the securely provided environment variables.
+final String _apiKey = Platform.environment['GEMINI_API_KEY'] ?? '';
 
 // The prompt we send to Gemini along with the image
 // This is carefully crafted to get a structured JSON response
@@ -29,15 +27,14 @@ ACT AS A HIGH-LEVEL DIGITAL FORENSICS EXPERT.
 Your task is to detect if an image is AI-generated (Synthetic) or a Real Photograph.
 
 AI models like Gemini, Midjourney, and DALL-E have specific "fingerprints" even when they look perfect. Look for:
-1. "AI WAXINESS": Skin that looks too smooth or plastic-like.
-2. "LIQUID EDGES": Blurry transitions between hair and background.
-3. "LIGHTING INCONSISTENCY": Shadows that don't match the light source.
-4. "PIXEL NOISE": Check for unnaturally clean areas vs. natural camera sensor grain.
-5. "DIGITAL ARTIFACTS": Strange patterns in complex textures like fabric or leaves.
+1. Abnormal skin smoothness and lack of natural pores.
+2. Inconsistencies in lighting and shadows.
+3. Strange patterns in complex areas like hair, hands, or eyes.
+4. Pixel noise: Check for unnaturally clean areas vs. natural camera sensor grain.
 
-MANDATORY: Even if the image is 99% realistic, if you see any "Synthetic Smoothness", mark it as isAI: true.
+MANDATORY: Be extremely aggressive in finding AI artifacts. If you see any abnormal smoothness or strange patterns, mark it as isAI: true.
 
-Respond ONLY with this JSON:
+Respond ONLY with a valid JSON object in this exact format (no markdown, no extra text):
 {"isAI": true or false, "confidence": 0.0 to 1.0, "reason": "Explain exactly which AI fingerprint you found."}
 ''';
 
@@ -55,13 +52,11 @@ Future<Response> onRequest(RequestContext context) async {
   }
 
   // Check if API key is configured
-  if (_apiKey == 'YOUR_GEMINI_API_KEY_HERE') {
+  if (_apiKey.isEmpty) {
     return Response.json(
       body: {
         'error': 'API key not configured! '
-            'Get your FREE key from: '
-            'https://aistudio.google.com/apikey '
-            'and paste it in routes/detect.dart',
+            'Please set the GEMINI_API_KEY environment variable.',
       },
       statusCode: HttpStatus.internalServerError,
     );
@@ -89,12 +84,12 @@ Future<Response> onRequest(RequestContext context) async {
 
 // ----- STEP 2: Initialize Latest Flash Model -----
 final model = GenerativeModel(
-  model: 'gemini-2.5-flash', // We use flash because pro has 0 free quota
+  model: 'gemini-2.0-flash', // Upgraded to Gemini 2.0 Flash
   apiKey: _apiKey,
   generationConfig: GenerationConfig(
     temperature: 0.1,
     maxOutputTokens: 1024,
-    responseMimeType: 'application/json',
+    responseMimeType: 'application/json', // Forces Gemini to return pure JSON
   ),
 );
 
