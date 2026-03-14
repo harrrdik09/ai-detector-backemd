@@ -21,15 +21,14 @@ RUN dart pub get
 RUN dart compile exe bin/server.dart -o bin/server
 
 # 7. Final minimal serving image layer
-# Using debian instead of 'scratch' so we have SSL certificates (needed for Gemini API)
-FROM debian:stable-slim
+# Using 'scratch' (empty image) because dart:stable provides all needed system files, 
+# including SSL certificates for Gemini, in its /runtime folder!
+FROM scratch
 
-# Install latest SSL Certificates for HTTPS calls to Google AI Studio
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
-
-# Copy runtime from dart image
+# Copy the Dart runtime and required configuration files
 COPY --from=build /runtime/ /
-# Copy compiled executable
+
+# Copy the compiled Dart executable
 COPY --from=build /app/build/bin/server /app/bin/
 
 # Set env and start the server
